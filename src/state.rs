@@ -1,12 +1,14 @@
+use crate::config::AppConfig;
+
 #[derive(Clone)]
 pub struct AppState{
-    app_name: String
+    pub config: AppConfig
 }
 
 impl AppState {
     pub fn new() -> Self {
         Self {
-            app_name: "Rust http server".to_string(),
+            config: AppConfig::from_env()
         }
     }
 }
