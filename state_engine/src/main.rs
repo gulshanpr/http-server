@@ -1,23 +1,34 @@
+use std::path::PathBuf;
 use crate::domain::event::Event;
 use crate::domain::job::Job;
 use crate::domain::state::JobState;
+use crate::storage::file::FileJobStore;
+use crate::storage::JobStore;
 
 mod engine;
 mod domain;
+mod storage;
 
 fn main() {
 
-    let mut job = Job::new(1);
-    println!("job created pending job state {:?}", job.state());
+    let store = FileJobStore::new(PathBuf::from("./data"));
 
-    job.handle(Event::Failed("testing".to_string()));
-    println!("job failed before starting(invalid state) {:?}", job.state());
+    std::fs::create_dir_all("./data").unwrap();
+
+    let mut job = match store.load(1) {
+        Ok(job) => {
+            println!("job recovered from disk");
+            job
+        },
+        Err(_) => {
+            println!("Creating new job");
+            Job::new(1)
+        }
+    };
 
     job.handle(Event::Start);
-    println!("job started {:?}", job.state());
+    store.save(&job).unwrap();
 
-
-    job.handle(Event::Finish);
-    println!("job completed {:?}", job.state());
+    println!("current job state {:?}", job.state());
 
 }
