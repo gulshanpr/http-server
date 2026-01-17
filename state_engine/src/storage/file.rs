@@ -18,13 +18,17 @@ impl FileJobStore {
     }
 }
 
+// implementing JobStore trait for FileJobStore that is for file storage
 impl JobStore for FileJobStore {
     fn save(&self, job: &Job) -> Result<(), String> {
+        // get the path
         let path = self.join_path(job.id());
-
+        
+        // struct to file compatible string format using serde_json (serializing)
         let data = serde_json::to_string_pretty(job)
             .map_err(|err| err.to_string())?;
-
+        
+        // only we can write bytes or string not XYZ { } rust struct
         fs::write(path, data)
             .map_err(|err| err.to_string())?;
 
@@ -32,11 +36,14 @@ impl JobStore for FileJobStore {
     }
 
     fn load(&self, id: u64) -> Result<Job, String> {
+        // get the path
         let path = self.join_path(id);
-
+        
+        // read as a string from file
         let data = fs::read_to_string(path)
             .map_err(|err| err.to_string())?;
-
+        
+        // Deserialize the string for struct
         let job = serde_json::from_str(&data)
             .map_err(|err| err.to_string())?;
 

@@ -11,10 +11,13 @@ mod storage;
 
 fn main() {
 
+    // location of the store
     let store = FileJobStore::new(PathBuf::from("./data"));
 
+    // create dir.
     std::fs::create_dir_all("./data").unwrap();
 
+    // mut because we want to change the job status
     let mut job = match store.load(1) {
         Ok(job) => {
             println!("job recovered from disk");

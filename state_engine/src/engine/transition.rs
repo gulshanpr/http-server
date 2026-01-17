@@ -14,6 +14,7 @@ impl JobState {
             (JobState::Running, Event::Failed(reason)) => (JobState::Failed(reason), TransitionResult::Applied),
             (JobState::Running, Event::Finish) => (JobState::Completed, TransitionResult::Applied),
 
+            // invalid state -> ignored
             (state, _) => (state, TransitionResult::Ignored)
         }
     }
