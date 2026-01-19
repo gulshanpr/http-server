@@ -1,1 +1,1 @@
-mod worker;
+pub mod worker;

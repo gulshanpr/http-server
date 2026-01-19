@@ -6,6 +6,7 @@ use crate::storage::file::FileJobStore;
 use crate::storage::JobStore;
 use tokio::sync::mpsc;
 use crate::engine::transition::TransitionResult;
+use crate::runtime::worker::JobWorker;
 
 mod engine;
 mod domain;
@@ -27,30 +28,18 @@ fn process_event(event: Event) {
 }
 #[tokio::main]
 async fn main() {
-    let (tx, mut rx) = mpsc::channel::<Event>(8);
+    let job = Job::new(6);
 
-    let mut job = Job::new(3);
+    let (worker, sender) = JobWorker::new(job);
 
-    tx.send(Event::Failed("network error".to_string())).await.unwrap();
-    tx.send(Event::Start).await.unwrap();
-    tx.send(Event::Finish).await.unwrap();
+    let handle = tokio::spawn(worker.run());
 
-    drop(tx);
+    sender.send(Event::Finish).await.unwrap();
+    sender.send(Event::Start).await.unwrap();
+    sender.send(Event::Finish).await.unwrap();
 
-    while let Some(event) = rx.recv().await {
-        let result = job.handle(event);
+    drop(sender);
 
-        match result {
-            TransitionResult::Applied => {
-                println!("state changes -> {:?}", job.state());
-            }
-            TransitionResult::Ignored => {
-                println!("state change ignored, state = {:?}", job.state());
-            }
-        };
-
-    }
-
-    println!("final state = {:?}", job.state());
+    handle.await.unwrap();
 
 }
