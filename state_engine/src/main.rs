@@ -4,34 +4,53 @@ use crate::domain::job::Job;
 use crate::domain::state::JobState;
 use crate::storage::file::FileJobStore;
 use crate::storage::JobStore;
+use tokio::sync::mpsc;
+use crate::engine::transition::TransitionResult;
 
 mod engine;
 mod domain;
 mod storage;
+mod runtime;
 
-fn main() {
-
-    // location of the store
-    let store = FileJobStore::new(PathBuf::from("./data"));
-
-    // create dir.
-    std::fs::create_dir_all("./data").unwrap();
-
-    // mut because we want to change the job status
-    let mut job = match store.load(1) {
-        Ok(job) => {
-            println!("job recovered from disk");
-            job
+fn process_event(event: Event) {
+    match event {
+        Event::Start => {
+            println!("event start");
         },
-        Err(_) => {
-            println!("Creating new job");
-            Job::new(1)
+        Event::Finish => {
+            println!("event end");
+        },
+        Event::Failed(reason) => {
+            println!("event failed {}", reason);
         }
     };
+}
+#[tokio::main]
+async fn main() {
+    let (tx, mut rx) = mpsc::channel::<Event>(8);
 
-    job.handle(Event::Start);
-    store.save(&job).unwrap();
+    let mut job = Job::new(3);
 
-    println!("current job state {:?}", job.state());
+    tx.send(Event::Failed("network error".to_string())).await.unwrap();
+    tx.send(Event::Start).await.unwrap();
+    tx.send(Event::Finish).await.unwrap();
+
+    drop(tx);
+
+    while let Some(event) = rx.recv().await {
+        let result = job.handle(event);
+
+        match result {
+            TransitionResult::Applied => {
+                println!("state changes -> {:?}", job.state());
+            }
+            TransitionResult::Ignored => {
+                println!("state change ignored, state = {:?}", job.state());
+            }
+        };
+
+    }
+
+    println!("final state = {:?}", job.state());
 
 }
