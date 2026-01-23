@@ -1,19 +1,29 @@
-use tokio::sync::mpsc;
 use crate::domain::event::Event;
 use crate::domain::job::Job;
 use crate::engine::transition::TransitionResult;
+use crate::storage::JobStore;
+use tokio::sync::mpsc;
+use tracing::error;
 
-pub struct JobWorker {
+pub struct JobWorker<S>
+where
+    S: JobStore,
+{
     job: Job,
+    store: S,
     receiver: mpsc::Receiver<Event>,
 }
 
-impl JobWorker {
-    pub fn new(job: Job) -> (Self, mpsc::Sender<Event>) {
+impl<S> JobWorker<S>
+where
+    S: JobStore,
+{
+    pub fn new(job: Job, store: S) -> (Self, mpsc::Sender<Event>) {
         let (tx, rx) = mpsc::channel(8);
 
         let worker = Self {
             job,
+            store,
             receiver: rx,
         };
 
@@ -21,21 +31,23 @@ impl JobWorker {
     }
 
     pub async fn run(mut self) {
-        while let Some(event) = self.receiver.recv().await {
-            let result = self.job.handle(event);
+        loop {
+            tokio::select! {
+                Some(event) = self.receiver.recv() => {
+                    let result = self.job.handle(event);
 
-            match result {
-                TransitionResult::Applied => {
-                    println!("state changed -> {:?}", self.job.state());
+                    if let TransitionResult::Applied = result {
+                        if let Err(e) = self.store.save(&self.job) {
+                            error!(error = %e, "failed to persist job");
+                        }
+                    }
                 }
-
-                TransitionResult::Ignored => {
-                    println!("event ignored, state = {:?}", self.job.state());
+                _ = tokio::signal::ctrl_c() => {
+                    println!("shutdown signal recieved");
+                    break;
                 }
             }
-
-            println!("worker stopped, final state = {:?}", self.job.state());
-
         }
+        println!("worker stopped, final state = {:?}", self.job.state());
     }
 }

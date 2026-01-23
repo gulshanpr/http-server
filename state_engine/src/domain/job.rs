@@ -1,7 +1,7 @@
 use crate::domain::event::Event;
 use crate::domain::state::JobState;
 use crate::engine::transition::TransitionResult;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Job {
     id: u64,
@@ -12,7 +12,7 @@ impl Job {
     pub fn new(id: u64) -> Self {
         Job {
             id,
-            job_state: JobState::Pending
+            job_state: JobState::Pending,
         }
     }
 
